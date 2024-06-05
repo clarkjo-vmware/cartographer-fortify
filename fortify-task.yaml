@@ -1,0 +1,13 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: fortify-scan-task
+spec:
+  steps:
+    - name: fortify-scan
+      image: fortifydocker/fortify-cli
+      script: |
+        #!/bin/sh
+        # Fortify scan commands
+        fortify-cli --project my-project --ssc-url https://ssc-server --auth-token $FORTIFY_TOKEN --version
+        fortify-cli scan central --project-name my-project --project-version my-version --source my-source --ssc-url https://ssc-server --auth-token $FORTIFY_TOKEN
