@@ -1,0 +1,104 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: fortify-scanner
+  namespace: dev
+  labels:
+    app.kubernetes.io/version: "0.2"
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.12.1"
+    tekton.dev/categories: Security
+    tekton.dev/tags: security
+    tekton.dev/displayName: "fortify_scanner"
+    tekton.dev/platforms: "linux/amd64"
+spec:
+  description: >-
+    The following task can be used to perform static analysis on the source code
+    on the Fortify. Fortify supports SAST, DAST, Code Quality and Security
+    of your codebases, all while empowering development teams. Analyze over 25 popular
+    programming languages including C#, VB.Net, JavaScript, TypeScript, and C++. It detects
+    bugs, vulnerabilities, and code smells across project branches and pull requests.
+  params:
+    - name: SSC_URL
+      description: Host URL where the SSC is running
+      default: "fortify-ssc-url"
+    - name: SSC_TOKEN
+      description: Project's unique key
+      default: "fortify-ssc-token"
+    - name: UPLOAD_TOKEN
+      description: Auth for the project
+      default: "fortify-ssc-token"
+    - name: POOL_ID
+      description: Pool ID for the scan
+      default: "sensor-pool-id"
+    - name: EMAIL
+      description: Email for the scan
+      default: "notification-email"
+    - name: BUILD_TOOL
+      description: Build tool in use
+      default: "none"
+    - name: SOURCE
+      description: Type of scan input
+      default: "-source"
+    - name: JAVA_VERSION
+      description: Java version listed
+      default: "11"
+    - name: APPLICATION_NAME
+      description: Application name for SSC project
+      default: "fortify-ssc-application-name"
+    - name: APPLICATION_VERSION
+      description: Version of the application
+      default: "fortify-ssc-application-version"
+    - name: revision
+      description: Revision of the source code
+    - name: repository
+      description: Name of repository
+    - name: workload
+      description: Name of workload
+
+  workspaces:
+    - name: tmp-workspace
+
+  steps:
+    - name: fortify-test
+      image: fortify-cli
+      # imagePullPolicy: Always
+      workingDir: $(workspaces.tmp-workspace.path)
+      env:
+      # These sensitive values are referencing existing secrets within the namespace of this tekton task Ensure the secrets are present.
+      - name: SSC_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: fortify-values
+            key: ssc_token
+      - name: UPLOAD_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: fortify-values
+            key: upload_token
+      - name: POOL_ID
+        valueFrom:
+          secretKeyRef:
+            name: fortify-values
+            key: pool_id
+      script: |
+        #!/usr/bin/env bash
+        # Download the code from the location created by Cartographer
+        # (Cartographer already fetched the code for us, so we don't 
+        # need to fetch it from the git repo).
+        wget -qO- $(params.repository) | tar xvz
+
+        echo "Execute the fortify scan"
+        scancentral -sscurl "$(params.SSC_URL)" \
+            -ssctoken "$SSC_TOKEN" \
+            start -upload \
+            -uptoken "$UPLOAD_TOKEN" \
+            --application "$(params.APPLICATION_NAME)" \
+            --application-version "$(params.APPLICATION_VERSION)" \
+            -pool "$POOL_ID" \
+            -email "$(params.EMAIL)" \
+            --build-tool "$(params.BUILD_TOOL)" \
+            -targs "$(params.SOURCE)" \
+            -targs "$(params.JAVA_VERSION)"
+
+        exit 0

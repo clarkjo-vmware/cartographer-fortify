@@ -1,0 +1,36 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: fortify-pipeline
+  namespace: dev
+  labels:
+    apps.tanzu.vmware.com/use-fortify: "true"
+spec:
+  params:
+    - name: repository
+      type: string
+    - name: revision
+      type: string
+    - name: workload
+      type: string
+  workspaces:
+    - name: tmp-workspace
+  tasks:
+    - name: fortify-scan
+      taskRef:
+        name: fortify-scanner
+      workspaces:
+        - name: tmp-workspace
+          workspace: tmp-workspace
+      params:
+
+        # We have to pass both the url and the rev because Cartographer
+        # expects those from any ClusterSourceTemplate. The TaskRun that
+        # gets automatically created will have those parameters ONLY IF
+        # we list them here.
+        - name: repository
+          value: $(params.repository)   # this comes from the 'params' in the spec above ^
+        - name: revision
+          value: $(params.revision)     # This one, too
+        - name: workload
+          value: $(params.workload)
